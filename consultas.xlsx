@@ -1,0 +1,91 @@
+ID	Category	FieldName	Description	Expression	Version	Date_added
+01	Conversion	Result_ppm	Convierte result_text a ppm. Si la unidad es ug/L o ug/kg divide por 1000.	"Result_ppm: Iif([result_text] Is Null,Null,
+Iif([result_unit]=""ug/kg"" Or [result_unit]=""ug/l"",
+Val([result_text])/1000,
+[result_text]))"	result_text a ppm	
+02	Qualifier	DQ	Si el qualifier es U o UJ escribe ND. En cualquier otro caso conserva el qualifier.	"DQ: Iif(IsNull([result_text]) Or [result_text]="""",
+Iif([interpreted_qualifiers]=""U"" Or
+[interpreted_qualifiers]=""UJ"",
+""ND"",
+[interpreted_qualifiers]),
+[interpreted_qualifiers])"	ND_format	
+03	Sortdate	Sortdate	Genera una cadena de texto ordenable que combina fecha y profundidad.	"sortdate: IIf([start_depth] Is Null,
+    Format([sample_date],'yyyymmdd'),
+    Format([sample_date],'yyyymmdd')
+        & Format([start_depth]/1000,'0.0000')"	(Date+depth)_format	
+04	Sampledate	sampledate	Extrae únicamente la parte de fecha del campo sample_date, descartando la hora si estuviera presente.	"sampledate: IIf([sample_date] Like '* *',
+    Left([sample_date], InStr([sample_date],' ')),
+    [sample_date]
+)"	Date_format	
+05	Depth	Depth	Si start_depth tiene valor, construye la cadena '(inicio-fin) unidad'	"Depth: IIf([start_depth] Is Not Null,
+    '(' & [start_depth] & '-' & [end_depth] & ') ' & [depth_unit],
+    '-'
+)"	Depth_range	
+06	Result	Result	si interpreted_qualifiers es 'R', devuelve solo 'R'.si result_text es nulo, arma 'ND(límite_detección),concatena result_text con el calificador (sin 'U')	Result: Iif([interpreted_qualifiers] Like 'R','R',Iif([result_text] Is Null, Trim('ND(' & [reporting_detection_limit] & ') ' & Replace(Nz([interpreted_qualifiers],''),'U','')),Trim([result_text] & ' ' & Replace(Nz([interpreted_qualifiers],''),'U',''))))	ND_format	
+07	SampleType	sampletype	Convierte el código de tipo de muestra en una etiqueta descriptiva legible para el usuario. (orig,Duplicate,Triplicate)	"sampletype: IIf([sample_type_code] Like 'N',
+    '(orig)',
+    IIf([sample_type_code] Like 'FD',
+        '(Duplicate)',
+        IIf([sample_type_code] Like 'FT',
+            '(Triplicate)',
+            '(other)'
+        )
+    )
+)"	sample_type: Orig, Duplicate,Triplicate,(other)	
+08	ResultU	ResultU	Crea una columna de resultado mostrable concatenando el valor y el qualifier. Si result_text está vacío, utiliza el reporting_detection_limit; si el qualifier es R, muestra únicamente R.	ResultU: IIf([result_text] Is Null,Iif([interpreted_qualifiers]="R","R",Iif([dbo_dt_result]![RDL] Is Null,[interpreted_qualifiers],[dbo_dt_result]![RDL] & " " & [interpreted_qualifiers])),[result_text] & " " & [interpreted_qualifiers])	Result+qualifier	
+09	ResultLessThan	ResultLT	Crea un valor para reporte donde los no detectados se muestran como "< límite de detección". Cuando existe result_text, muestra el resultado junto con el qualifier (sin la letra U). Si el qualifier es R, devuelve únicamente R.	ResultLT: IIf([interpreted_qualifiers] Like "R","R",IIf([result_text] Is Null,Trim("< " & [reporting_detection_limit] & " " & Replace(Nz([interpreted_qualifiers],''),'U','')),Trim([result_text] & " " & Replace(Nz([interpreted_qualifiers],''),'U',''))))	<_format	
+10	Result_unit_ppb	Result_unit_ppb	Transforma la unidad de mg/L a ug/L, en otro caso deja la unidad de result_unit	result_unit_ppb: IIf([result_unit]="mg/L","ug/L",[result_unit])	de mg/L a ug/L, otro caso mantiene la unidad	
+11	Result_unit_ppm	Result_unit_ppm	Transforma la unidad de ug/L a mg/L, en otro caso deja la unidad de result_unit	result_unit_ppb: IIf([result_unit]="ug/L","mg/L",[result_unit])		
+12	Result	Result	Genera un resultado para reporte concatenando el valor y el qualifier. Si result_text está vacío utiliza el reporting_detection_limit. Si la unidad es mg/L, convierte el resultado a ug/L multiplicando por 1000. Si el qualifier es R, devuelve únicamente R.	Result: IIf([interpreted_qualifiers] Like "R","R",IIf([result_text] Is Null,Trim([reporting_detection_limit] & " " & [interpreted_qualifiers]),Trim(IIf([result_unit]="mg/L",CStr(Val([result_text])*1000),[result_text]) & " " & [interpreted_qualifiers])))	valor+qualifier, convierte de mg/L a ug/L	
+13	Sort_columns	SORT_COLUMNS	Crea una clave de ordenación combinando la fecha de muestreo y la profundidad inicial para ordenar registros cronológicamente y por profundidad.	SORT_COLUMNS: Format([sample_date],"yyyymmdd") & Format([start_depth]*0.01)	Date+depth_sorted	
+14	Chemical_order	ChemicalOrder	Ordena los quimicos en un orden especifico. Se debe agregar order by: ascendent	"ChemicalOrder:
+Switch(
+[chemical_name]=""Benzene"",1,
+[chemical_name]=""Toluene"",2,
+[chemical_name]=""Ethylbenzene"",3,
+[chemical_name]=""Xylenes (total)"",4,
+True,999
+)"	Chemical_order	
+15	Date	Date_Format	Cambia el formato de fecha a yyyy/mm/dd	Date_Format: Format([sample_date],"yyyy/mm/dd")	Date_format	
+16	Depth	Depth	start_depth - end_depth unit	Depth: dbo_dt_sample!start_depth & "-" & dbo_dt_sample!end_depth & " " & dbo_dt_sample!depth_unit	start_depth - end_depth unit	
+17	Sample Type	sample_type	Si sample_type_code es igual a FD, lo asigna como Duplicate, en otro caso : (ORIG)	sample_type: IIf([dbo_dt_sample]![sample_type_code]="FD","Duplicate","(ORIG)")	sample_type:Duplicate,(ORIG)	
+18	Fractioncode	FracCode_New	Cambia el nombre del fractioncode	FracCode_New: IIf([fractioncode] Like "voasbtex","VOAs",[fractioncode])	Fractioncode_rename	
+19	Result	Result	Si result_text is null, reporta concatenando el RDL con interpreted_qualifiers, si result_test tiene valor entonces concatena result_text con interpreted_qualifiers	Result: IIf([interpreted_qualifiers] Like "R","R",IIf([result_text] Is Null,Trim([reporting_detection_limit] & " " & [interpreted_qualifiers]),Trim([result_text] & " " & [interpreted_qualifiers])))	RDL_result+interpreted_qualifiers	
+20	Result_ppm	RV_ppm	Si result_text es null, lo deja vacio. Si result_unit esta en ug/kg o ug/l, entonces toma el valor y lo divide en mil transformandolo a mg/L, en otro caso deja result_text	RV_ppm: IIf([result_text] Is Null,Null,IIf([result_unit]="ug/kg" Or [result_unit]="ug/l",Val([result_text])/1000,[result_text]))	util para FieldParam, toma ug/kg a ug/l	
+21	Unit	PPM_unit	convierte ug a mg	PPM_unit: IIf([result_unit]="ug/kg","mg/kg",IIf([result_unit]="ug/l","mg/L",[result_unit]))	convierte ug a mg, las demas unidades las deja tal cual	
+22	Result_RDL_ppm	RDL_ppm	Convierte el Reporting Detection Limit (RDL) a ppm. Si la unidad es ug/kg o ug/L divide el valor por 1000.	"RDL_ppm:
+IIf([reporting_detection_limit] Is Null,
+    Null,
+    IIf([result_unit]=""ug/kg"" Or [result_unit]=""ug/l"",
+        Val([reporting_detection_limit])/1000,
+        [reporting_detection_limit]
+    )
+)"	RDL en ug/kg a ug/L	
+23	Result_MDL_ppm	MDL_ppm	Convierte el Method Detection Limit (MDL) a ppm. Si la unidad es ug/kg o ug/L divide el valor por 1000.	"MDL_ppm:
+IIf([method_detection_limit] Is Null,
+    Null,
+    IIf([result_unit]=""ug/kg"" Or [result_unit]=""ug/l"",
+        Val([method_detection_limit])/1000,
+        [method_detection_limit]
+    )
+)"	MDL_ppm	
+24	FP_order	FP_order	Ordena los Field Parameter, se debe asignar el nombre correcto a cada comilla, y luego ordenarlos de manera ascendiente	"FP_order:Switch(
+[chemical_name]=""pH"",1,
+[chemical_name]=""Oxidationreductionpotential(ORP)"",2,
+[chemical_name]=""Dissolvedoxygen(DO)"",3,
+[chemical_name]=""Conductivity"",4,
+[chemical_name]=""Clarity"",5,
+[chemical_name]=""Temperature"",6,
+True,999
+)"	FieldParam_order	
+25	Exceedance	Exceedance	Indica si el resultado excede el criterio de comparación.	"Exceedance:
+IIf(
+Val([Result_ppm]) > Val([Criteria_ppm]),
+""Yes"",
+""No""
+)"	Exceedance	
+26	Measurement Date	Measurement Date	Formato de fecha mm/dd/yyyy	Measurement Date: Format([measurement_date],"mm/dd/yyyy")	WL-Date_format	
+27	Measurement Time	Measurement Time	Formato de hora	Measurement Time: Format([measurement_date],"Short Time")	WL_Time_Format	
+28	SortDate_WL	SortDate_WL	SortDate en formato yyyymmdd	SortDate: Format([measurement_date],"yyyymmdd")	SortDate_WL	
+29	CheckingDTW(depth to water)	CheckingDTW	Calcula la profundidad al nivel de agua (DTW, Depth to Water) restando la elevación del nivel de agua a la elevación de referencia histórica.	CheckingDTW: Val([historical_reference_elev])-Val([water_level_elev])	WL_CheckDTW	
+30	Corrected Groundwater Elevation	Corrected Groundwater Elevation	(TOC-GWE)+(0.82*LNPALthickness) = GWE_corrected. Calcula la elevación corregida del nivel freático considerando el espesor de LPH (Light Phase Hydrocarbon). Si no existe profundidad al agua, conserva la elevación original.	Corrected Groundwater Elevation: IIf(IsNull([Depth to Groundwater]),[Groundwater Elevation],Round([Groundwater Elevation]+([LPH Thickness]*0.858),2))	Corrected Groundwater Elevation	
